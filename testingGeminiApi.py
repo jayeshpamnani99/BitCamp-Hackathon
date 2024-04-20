@@ -1,25 +1,78 @@
-# # Install the SDK (assuming you haven't already)
-# # pip install google-cloud-aiplatform>=1.38
-
 import google.generativeai as genai
+import json
+import csv
+import re
+import pandas as pd
+import os
 
-# Set your API key (replace with your actual key)
-your_api_key = "AIzaSyDUwAn805A5NZY4fUrQSyUOmFDrv5KjtO8"
-genai.configure(api_key=your_api_key)
-text = "Lockheed Martin Rotary and Mission Systems, Owego, New York, was awarded a $88,380,255 Captains of Industry contract for the overhaul of B-2 digital receiver and legacy defense message system. This contract provides for overhaul, management, and material lay-in. Work will be performed at Owego, New York, and is expected to be completed by April 16, 2034. This contract was a sole source acquisition. No funds are being obligated at time of award. The Air Force Sustainment Center, Tinker Air Force Base, Oklahoma, is the contracting activity (FA8119-24-D-0008). (Awarded April 17, 2024)"
+def gemini_data_extraction(text):
+    your_api_key = "AIzaSyDUwAn805A5NZY4fUrQSyUOmFDrv5KjtO8"
+    genai.configure(api_key=your_api_key)
+    model = genai.GenerativeModel('gemini-pro')
+    query = "give me json format - do not generate new data- who is the contractor? what is the location? what is the cost? what is the purpose? WHhen will the work be completed? where will the work be performed? What is the contract number? Give me the contracting activity?"
+    response = model.generate_content(text+query)
+    generated_text= ""
+    if response :
+        generated_text = response.text
+    return generated_text
 
-# Select the model (choose 'gemini-pro' for advanced features)
-model = genai.GenerativeModel('gemini-pro')
+with open('contracts.json', 'r') as file:
+    parsed_data = json.load(file)
 
-# Provide a prompt for generation
-query = "give me json format who is the contractor? what is the location? what is the cost? what is the purpose? WHhen will the work be completed? where will the work be performed? What is the contract number?"
+def extract_and_convert_to_csv(additional_string, mixed_string, output_file):
+    # Function to flatten nested dictionaries
+    def flatten_dict(d, parent_key='', sep='_'):
+        items = []
+        for k, v in d.items():
+            new_key = parent_key + sep + k if parent_key else k
+            if isinstance(v, dict):
+                items.extend(flatten_dict(v, new_key, sep=sep).items())
+            else:
+                items.append((new_key, v))
+        return dict(items)
 
-# Generate content
-response = model.generate_content(text+query)
+    # Use regular expressions to extract JSON portion
+    json_match = re.search(r'{.*?}', mixed_string, re.DOTALL)
+    if json_match:
+        json_string = json_match.group(0)
 
-# Access the generated text
-generated_text = response.text
+        # Parse the JSON string
+        data = json.loads(json_string)
 
-# Print the generated poem
-print(generated_text)
+        # Flatten the nested JSON structure
+        flattened_data = flatten_dict(data)
 
+        # Convert flattened data to DataFrame
+        df = pd.DataFrame([flattened_data])
+
+        # Add additional string as the first column
+        df.insert(0, 'agency_name', additional_string)
+
+        # Append DataFrame to CSV file
+        if os.path.exists(output_file):
+            df.to_csv(output_file, mode='a', index=False, header=False)
+        else:
+            df.to_csv(output_file, index=False)
+
+    else:
+        print("No JSON data found in the string.")
+
+
+def clean_data(data):
+    left = 0
+    right =-1
+    while left<len(data) and data[left] != '{':
+        left+=1
+    while right>-len(data) and data[right] != '}':
+        right-=1
+    return data[left:right+1]
+
+for parsed_data_each_page in parsed_data:
+    for agency,contracts in parsed_data_each_page.items():
+        for contract in contracts:
+            data = gemini_data_extraction(contract)
+            data = clean_data(data)
+            print(data)
+            extract_and_convert_to_csv(agency,data, "data.csv")
+            # generate_csv(data,agency)
+            print()
