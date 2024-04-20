@@ -1,8 +1,9 @@
 import json
 import re
-import csv
+import pandas as pd
+import os
 
-def extract_and_convert_to_csv(mixed_string, output_file):
+def extract_and_convert_to_csv(agencyName, incomingData, output_file):
     # Function to flatten nested dictionaries
     def flatten_dict(d, parent_key='', sep='_'):
         items = []
@@ -15,7 +16,7 @@ def extract_and_convert_to_csv(mixed_string, output_file):
         return dict(items)
 
     # Use regular expressions to extract JSON portion
-    json_match = re.search(r'{.*?}', mixed_string, re.DOTALL)
+    json_match = re.search(r'{.*?}', incomingData, re.DOTALL)
     if json_match:
         json_string = json_match.group(0)
 
@@ -25,18 +26,24 @@ def extract_and_convert_to_csv(mixed_string, output_file):
         # Flatten the nested JSON structure
         flattened_data = flatten_dict(data)
 
-        # Write flattened data to CSV in append mode
-        with open(output_file, "a", newline="") as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=flattened_data.keys())
-            # Check if the file is empty; if so, write header
-            if csvfile.tell() == 0:
-                writer.writeheader()
-            writer.writerow(flattened_data)
+        # Convert flattened data to DataFrame
+        df = pd.DataFrame([flattened_data])
+
+        # Add additional string as the first column
+        df.insert(0, 'Agency_Name', agencyName)
+
+        # Append DataFrame to CSV file
+        if os.path.exists(output_file):
+            df.to_csv(output_file, mode='a', index=False, header=False)
+        else:
+            df.to_csv(output_file, index=False)
+
     else:
         print("No JSON data found in the string.")
 
 # Example usage:
-mixed_string = '''
+agencyName = "ARMY"
+incomingData = '''
 {
     "contractor": "Lockheed Martin Rotary and Mission Systems",
     "location": "Owego, New York",
@@ -48,11 +55,11 @@ mixed_string = '''
     "contracting_activity": "Air Force Sustainment Center, Tinker Air Force Base, Oklahoma"
 }
 '''
-output_file = "outpu1t.csv"
+output_file = "output.csv"
 
 # Call the function multiple times
-extract_and_convert_to_csv(mixed_string, output_file)
-# Call it again with another mixed_string if needed
-# extract_and_convert_to_csv(another_mixed_string, output_file)
-extract_and_convert_to_csv(mixed_string, output_file)
-extract_and_convert_to_csv(mixed_string, output_file)
+extract_and_convert_to_csv(agencyName, incomingData, output_file)
+# Call it again with another incomingData if needed
+# extract_and_convert_to_csv(another_agencyName, another_incomingData, output_file)
+extract_and_convert_to_csv(agencyName, incomingData, output_file)
+extract_and_convert_to_csv(agencyName, incomingData, output_file)
