@@ -26,7 +26,7 @@ You need to have Gemini API Key to run this project
 
 1. Clone the repository:
    ```bash
-   https://github.com/anjaneyak10/Hackathon.git
+   https://github.com/jayeshpamnani99/BitCamp-Hackathon.git
    ```
 2. Change directory to the cloned repository.
 3. Install the required Python packages:
